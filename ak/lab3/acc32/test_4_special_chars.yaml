@@ -1,0 +1,19 @@
+name: test_4_special_chars
+limit: 1000
+memory_size: 0x1000
+
+memory_mapped_io:
+  0x80: ["1", "2", "3", "!", " ", "A", "-", "Z", "\n"]
+  0x84: []
+
+reports:
+  - name: Result
+    slice: last
+    view: |
+      symio[0x80]: {io:0x80:sym}
+      numio[0x84]: {io:0x84:dec}
+      {memory:0:31}
+    assert: |
+      symio[0x80]: "" >>> ""
+      numio[0x84]: [] >>> [0]
+      mem[0..31]: 	31 32 33 21 20 61 2d 7a 00 00 00 00 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f

@@ -1,0 +1,25 @@
+name: test_hello
+limit: 1000
+memory_size: 0x1000
+
+memory_mapped_io:
+  0x80: ["H", "E", "L", "L", "O", "\n"]
+  0x84: []
+
+reports:
+  - name: Trass
+    slice: all
+    view: |
+    
+      {pc}:	{instruction:next}	{pc:label}  
+      ---
+  - name: Result
+    slice: last
+    view: |
+      symio[0x80]: {io:0x80:sym}
+      numio[0x84]: {io:0x84:dec}
+      {memory:0:31}
+    assert: |
+      symio[0x80]: "" >>> ""
+      numio[0x84]: [] >>> [0]
+      mem[0..31]: 	68 65 6c 6c 6f 00 00 00 00 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f

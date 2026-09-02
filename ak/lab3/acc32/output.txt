@@ -1,0 +1,73 @@
+0:	buf
+32:	input_addr
+36:	output_addr
+40:	char_val
+44:	cur_ptr
+48:	count
+52:	const_0
+56:	const_1
+60:	const_31
+64:	const_10
+68:	const_32
+72:	const_65
+76:	const_90
+80:	const_error
+84:	_start
+98:	read_loop
+155:	store_char
+186:	overflow_error
+199:	finish_string
+215:	halt_label---
+mem[0..31]: 	5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f	@"buf"
+mem[32..35]: 	80 00 00 00	@"input_addr"
+mem[36..39]: 	84 00 00 00	@"output_addr"
+mem[40..43]: 	00 00 00 00	@"char_val"
+mem[44..47]: 	00 00 00 00	@"cur_ptr"
+mem[48..51]: 	00 00 00 00	@"count"
+mem[52..55]: 	00 00 00 00	@"const_0"
+mem[56..59]: 	01 00 00 00	@"const_1"
+mem[60..63]: 	1f 00 00 00	@"const_31"
+mem[64..67]: 	0a 00 00 00	@"const_10"
+mem[68..71]: 	20 00 00 00	@"const_32"
+mem[72..75]: 	41 00 00 00	@"const_65"
+mem[76..79]: 	5a 00 00 00	@"const_90"
+mem[80..83]: 	cc cc cc cc	@"const_error"
+mem[84..88]: 	LoadImm 0 	@_start
+mem[89..91]: 	Store (-45)
+mem[92..94]: 	Load (-40)
+mem[95..97]: 	Store (-47)
+mem[98..100]: 	Load (-66) 	@read_loop
+mem[101..101]: 	LoadAcc
+mem[102..104]: 	Store (-62)
+mem[105..107]: 	Sub 64
+mem[108..112]: 	Beqz 199
+mem[113..115]: 	Load (-65)
+mem[116..118]: 	Sub 60
+mem[119..123]: 	Bgez 186
+mem[124..126]: 	Load (-84)
+mem[127..129]: 	Sub 72
+mem[130..134]: 	Blz 155
+mem[135..137]: 	Load (-59)
+mem[138..140]: 	Sub 40
+mem[141..145]: 	Blz 155
+mem[146..148]: 	Load (-106)
+mem[149..151]: 	Add 68
+mem[152..154]: 	Store (-112)
+mem[155..157]: 	Load (-115) 	@store_char
+mem[158..162]: 	StoreInd 44
+mem[163..165]: 	Load (-119)
+mem[166..168]: 	Add 56
+mem[169..171]: 	Store (-125)
+mem[172..174]: 	Load (-124)
+mem[175..177]: 	Add 56
+mem[178..180]: 	Store (-130)
+mem[181..185]: 	Jmp 98
+mem[186..188]: 	Load (-106) 	@overflow_error
+mem[189..193]: 	StoreInd 36
+mem[194..198]: 	Jmp 215
+mem[199..201]: 	Load (-147) 	@finish_string
+mem[202..206]: 	StoreInd 44
+mem[207..209]: 	Load (-155)
+mem[210..214]: 	StoreInd 36
+mem[215..215]: 	Halt 	@halt_label
+mem[216..511]: 	( 00 )

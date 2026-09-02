@@ -1,0 +1,22 @@
+name: test_fill_array
+limit: 1000
+memory_size: 0x1000
+
+memory_mapped_io:
+  0x80: [4]
+  0x84: []
+
+reports:
+  - name: Step-by-step
+    slice: all
+    view: |
+      {pc}:	{instruction:next}	{pc:label} {memory:table}
+  - name: Result
+    slice: last
+    view: |
+      numio[0x80]: {io:0x80:dec}
+      numio[0x84]: {io:0x84:dec}
+      mem[buffer]: {memory:32:35}
+    assert: |
+      numio[0x80]: [] >>> []
+      numio[0x84]: [] >>> [0]
