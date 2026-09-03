@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ru">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Лабораторная работа 1</title>
+        <link rel="stylesheet" href="style.css">
+    </head>
+    <body>
+        <table class="header-table">
+          <tr>
+              <td>
+                  <strong>ФИО:</strong> Малых Кирилл Романович | <strong>Группа:</strong> P3232 | <strong>Вариант:</strong> 22717
+              </td>
+          </tr>
+        </table>
+        <table class="main-layout">
+            <tr>
+              <!-- Левая колонвка -->
+              <td class="column" style="width: 60%; text-align: center;">
+                <canvas id="graphCanvas" width="700" height="700"></canvas>
+            </td>
+            <!--Правая колонка -->
+            <td class="column" style="width: 40%;">
+              <form id="pointForm">
+                  <table style="width: 100%;">
+
+                      <!--Про X -->
+
+                      <tr>
+                        <td>
+                          <strong>Изменение X:</strong>
+                        </td>
+                        <td>
+                          <select id="x_val" required>
+                              <option value="" disabled selected>Выберите значение</option>
+                              <option value="-3">-3</option>
+                              <option value="-2">-2</option>
+                              <option value="-1">-1</option>
+                              <option value="0">0</option>
+                              <option value="1">1</option>
+                              <option value="2">2</option>
+                              <option value="3">3</option>
+                              <option value="4">4</option>
+                              <option value="5">5</option>
+                          </select>
+                        </td>
+                      </tr>
+
+                      <!--Про Y-->
+
+                      <tr>
+                        <td>
+                            <strong>Изменение Y:</strong>
+                        </td>
+                        <td>
+                            <input type="text" id = "y_val" placeholder="Число от -3 до 5" required>
+                        </td>
+                      </tr>
+
+                      <!--Про R -->
+
+                      <tr>
+                        <td>
+                            <strong>Изменение R:</strong>
+                        </td>
+                        <td class="check-group">
+                          <div class="checkbox-container">
+                              <label>
+                                  <input type="checkbox" class="r-checkbox" value="1"> 1
+                              </label>
+                              <label>
+                                  <input type="checkbox" class="r-checkbox" value="2">2
+                              </label>
+                              <label>
+                                  <input type="checkbox" class="r-checkbox" value="3" checked>3
+                              </label>
+                              <label>
+                                  <input type="checkbox" class="r-checkbox" value="4">4
+                              </label>
+                              <label>
+                                  <input type="checkbox" class="r-checkbox" value="5">5
+                              </label>
+                          </div>
+                        </td>
+                      </tr>
+
+                      <!--Кнопка отправки-->
+                      <tr>
+                        <td colspan="2" style="text-align: center; padding-top: 15px ;">
+                            <button type="submit">Проверить точку</button>
+                        </td>
+                      </tr>
+                  </table>
+              </form>
+            </td>
+            </tr>
+        </table>
+        <!--Вывод результатов проверки -->
+        <table class="results-table" id="resultsTable">
+          <thead>
+              <tr>
+                  <th>X</th>
+                  <th>Y</th>
+                  <th>R</th>
+                  <th>Результат</th>
+                  <th>Время проверки</th>
+              </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <script src="script.js"></script>
+    </body>
+</html>
