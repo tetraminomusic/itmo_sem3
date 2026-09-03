@@ -1,0 +1,49 @@
+plugins {
+    id 'java'
+}
+
+group 'ru.ifmo'
+version '1.0'
+
+repositories {
+    mavenCentral()
+}
+
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src']
+        }
+    }
+}
+
+dependencies {
+    implementation files('lib/fastcgi-lib.jar')
+}
+
+
+jar {
+    manifest {
+        attributes 'Main-Class': 'FastCGIServer'
+    }
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+
+task deploy(type: Exec) {
+
+    dependsOn 'jar'
+
+
+    def localJarPath = tasks.jar.archiveFile.get().asFile.absolutePath
+    def remoteDest = "s502873@helios.cs.ifmo.ru:/home/studs/s502873/web/lab1/httpd-root/fcgi-bin/hello-world.jar"
+
+    commandLine 'scp', '-P', '2222',
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            localJarPath, remoteDest
+}

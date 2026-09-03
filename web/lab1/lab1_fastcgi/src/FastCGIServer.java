@@ -1,4 +1,5 @@
 import com.fastcgi.FCGIInterface;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -16,26 +17,55 @@ public class FastCGIServer {
     public static void main (String[] args) {
         FCGIInterface fcgiInterface = new FCGIInterface();
 
+
         while (fcgiInterface.FCGIaccept() >= 0) {
 
             long startTime = System.nanoTime();
 
             try {
-                sendTestResponse("Абоба");
-            } catch (NumberFormatException e) {
+
+                String queryString = System.getProperty("QUERY_STRING");
+
+                if (queryString == null || queryString.isEmpty()) {
+                    HttpResponse.sendError("Отсутствуют входные параметры в URL");
+                    continue;
+                }
+
+                Map<String, String> params = parseQueryString(queryString);
+                String xStr = params.get("x");
+                String yStr = params.get("y");
+                String rStr = params.get("r");
+
+                if (xStr == null || yStr == null || rStr == null) {
+                    HttpResponse.sendError("Пропущены какие-то параметры");
+                    continue;
+                }
+
+                double x = Double.parseDouble(xStr.replace(",","."));
+                double y = Double.parseDouble(yStr.replace(",","."));
+                double r = Double.parseDouble(rStr.replace(",","."));
+
+                AreaChecker.validate(x,y,r);
+
+                processAndSendResponse(x,y,r,startTime);
+            } catch (IllegalArgumentException e) {
                 /**
                  * Обработка ошибки, если заместо чисел в коордах пришли буковки
                  */
-
-                System.err.println("Клиент прислал неверный формат чисел: " + e.getMessage());
+                String errorMsg;
+                if (e instanceof NumberFormatException) {
+                    errorMsg = "Параметры X, Y и R должны быть валидными числами.";
+                } else {
+                    errorMsg = e.getMessage();
+                }
+                System.err.println("Ошибка валидации: " + errorMsg);
                 try {
-                    sendError("Ошибка валидации: коорды долдны быть числами");
+                    HttpResponse.sendError("Ошибка валидации: коорды долдны быть числами");
                 } catch (IOException ignored) {}
             } catch (IOException e) {
                 /**
                  * Обработка ошибки, если произошёл разрыв при записи в поток вывода
                  */
-
                 System.err.println("Сетевой сбой при общении с веб-сервером: " + e.getMessage());
             } catch (NullPointerException e) {
                 /**
@@ -45,7 +75,7 @@ public class FastCGIServer {
                 System.err.println("Ошибка NullPointerException на сервере");
                 e.printStackTrace();
                 try { //логи
-                    sendSystemError("Внутренняя ошибка сервера (NullPointer).");
+                    HttpResponse.sendSystemError("Внутренняя ошибка сервера (NullPointer).");
                 } catch (IOException ignored) {}
             } catch (Exception e) {
                 /**
@@ -54,7 +84,7 @@ public class FastCGIServer {
 
                 System.err.println("Исключение: " + e.getClass().getName() + " - " + e.getMessage());
                 try {
-                    sendSystemError("Внутренняя ошибка сервера: " + e.getMessage());
+                    HttpResponse.sendSystemError("Внутренняя ошибка сервера: " + e.getMessage());
                 } catch (IOException ignored) {}
             }
         }
@@ -70,7 +100,7 @@ public class FastCGIServer {
         String httpResponse =
                 "Status: 200 OK\n" +
                         "Content-Type: text/plain; charset=utf-8\n" +
-                        "Content-Length: " + contentBytes +
+                        "Content-Length: " + contentBytes.length +
                         "\n\n" +
                         content;
 
@@ -81,38 +111,47 @@ public class FastCGIServer {
     }
 
     /**
-     * Отправка сообщений при ошибки валидации (400)
+     * Парсим сроку запроса
      */
-    private static void sendError(String message) throws IOException {
-        String jsonError = String.format("{\"error\":\"%s\"}", message.replace("\"", "\\\"")); //последняя шутка, чтобы экранировать кавычки и дсон не здох в итоге
-        byte[] bytes = jsonError.getBytes(StandardCharsets.UTF_8);
+    private static Map<String, String> parseQueryString(String query) {
+        Map<String, String> params = new HashMap<>();
 
-        String response =
-                "Status: 400 Bad Request\n" +
-                        "Content-Type: application/json; charset=utf-8\n" +
-                        "Content-Length: " + bytes.length + "\n\n" +
-                        jsonError;
+        //если ничё не пришло
+        if (query == null || query.isEmpty()) {
+            return params;
+        }
 
-        System.out.print(response);
-        System.out.flush();
+        //дробление
+        String[] pairs = query.split("&");
+
+        for (String pair: pairs) {
+            int idx = pair.indexOf("=");
+            if (idx > 0 && idx < pair.length() - 1) {
+                //получаем ключ
+                String key = pair.substring(0,idx);
+                //получаем значение
+                String value = pair.substring(idx+1);
+
+                params.put(key, value);
+            }
+        }
+
+        return params;
     }
 
-    /**
-     * Отправка сообщений о внутренней системной ошибки сервера (500)
-     */
-    private static void sendSystemError(String message) throws IOException {
-        String jsonError = String.format("{\"error\":\"Критический сбой сервера: %s\"}", message.replace("\"", "\\\""));
+    private static void processAndSendResponse(double x, double y, double r, long startTime) throws IOException {
+        boolean isInside = AreaChecker.isInside(x,y,r);
 
-        byte[] bytes = jsonError.getBytes(StandardCharsets.UTF_8);
+        long endTime = System.nanoTime();
+        double executionTimeMs = (endTime - startTime) / 1_000_000.0;
+        String currentTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 
-        String response =
-                "Status: 500 Internal Server Error\n" +
-                        "Content-Type: application/json; charset=utf-8\n" +
-                        "Content-Length: " + bytes.length + "\n\n" +
-                        jsonError;
-        System.out.print(response);
-        System.out.flush();
+        String currentJson = JsonUtils.formatResult(x, y, r, isInside, currentTime, executionTimeMs);
+
+        history.add(currentJson);
+
+        String responseJson = JsonUtils.buildResponseJson(currentJson, history);
+
+        HttpResponse.sendJson(responseJson);
     }
-
-
 }
