@@ -14,11 +14,13 @@ def tokenize(code: str) -> list:
     # "[^"]*" - текст в кавычках
     # \( - левая скобка
     # \) - правая скобка
+    # ;.* - комментарии
     # [^\s()] - ищет всё остальное (кроме скобок, и пробела)
 
-    pattern = r'"[^"]*"|\(|\)|[^\s()]+'
+    pattern = r'"[^"]*"|;.*|\(|\)|[^\s()]+'
+    tokens = re.findall(pattern, code)
 
-    return re.findall(pattern, code)
+    return [t for t in tokens if not t.startswith(';')]
 
 # Функция, которая отвечает за приведение к нужным типам данных у атомов списка lisp
 
@@ -47,14 +49,17 @@ def parse(tokens: list):
 
     if token == '(':
         sub_tree = []
-        while tokens[0] != ')':
+        while len(tokens) > 0 and tokens[0] != ')':
             sub_tree.append(parse(tokens))
+
+        if len(tokens) == 0:
+            raise SyntaxError("Ожидалась закрывающая скобка ')'")
 
         tokens.pop(0)
         return sub_tree
 
     elif token == ')':
-        raise SyntaxError("Лишняя закрывающая скобка ')'")
+        raise SyntaxError("Неожиданная закрывающая скобка ')'")
 
     else:
         return parse_atom(token)
