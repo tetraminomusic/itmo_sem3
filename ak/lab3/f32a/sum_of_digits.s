@@ -1,7 +1,9 @@
         .data
 
 input_addr:         .word 0x80
-output_addr:        .word 0x84        
+output_addr:        .word 0x84
+
+const_10:           .word 10
 
         .text
         .org 0x100
@@ -34,17 +36,21 @@ swap:
     ;
 
                                 \ Деление с остатком на 10
-
 divmod_10:
-    0 swap                      \ 0 - это количество десятков (q), а r - остаток
-divmod_loop:
-    dup -10 +                   \ Вычитаем десяточку
-    -if divmod_sub              \ Если ещё есть 10, то идём вычитать
+    a!
+    lit const_10 b!
+
+    0
+    0
+
+    31 >r
+
+div_loop:
+    +/
+    next div_loop
+
+    swap
     ;
-divmod_sub:
-    -10 +
-    swap 1 + swap
-    divmod_loop ;
 
                                 \ Основной цикл наращивания суммы
 

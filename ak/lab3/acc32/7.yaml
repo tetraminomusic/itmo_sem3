@@ -1,0 +1,25 @@
+# /app/variants/lower_case_cstr/7.yaml
+name: "assert lower_case_cstr('HELLO\0WORLD\n') == ('hello', '')
+# and mem[0..31]: 48 45 4c 4c 4f 00 57 4f 52 4c 44 00 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f"
+limit: 2000
+memory_size: 0x1000
+memory_mapped_io:
+  0x80: [72, 69, 76, 76, 79, 0, 87, 79, 82, 76, 68, 10]
+  0x84: []
+reports:
+  - name: Check results
+    slice: last
+    filter:
+      - state
+    view: |
+      numio[0x80]: {io:0x80:dec}
+      numio[0x84]: {io:0x84:dec}
+      symio[0x80]: {io:0x80:sym}
+      symio[0x84]: {io:0x84:sym}
+      {memory:0:31}
+    assert: |
+      numio[0x80]: [] >>> []
+      numio[0x84]: [] >>> [104,101,108,108,111]
+      symio[0x80]: "" >>> ""
+      symio[0x84]: "" >>> "hello"
+      mem[0..31]: 	68 65 6c 6c 6f 00 77 6f 72 6c 64 00 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f 5f

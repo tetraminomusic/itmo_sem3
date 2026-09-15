@@ -16,7 +16,7 @@ const_1:         .word  1
 
 stop_processing: .word  0
 
-const_FF_FF_FF_00: .word  0xFF_FF_FF_00
+const_FF_FF_FF_00: .word 0xFF_FF_FF_00
 const00_00_00_FF: .word  0x000000FF
 
 const_31:        .word  31                 ; Лимит слов
@@ -40,7 +40,7 @@ _start:
     store        stop_processing
 
 first_loop:
-
+    
     load         input_addr
     load_acc
 
@@ -66,32 +66,32 @@ first_loop:
     store        count
 
     jmp          first_loop
+    
 
-
-    ; Проход по буферу + ловеркейс его и параллельно вывод.
+; Проход по буферу + ловеркейс его и параллельно вывод.
 
 second_step:
 
     load         const_byte_0
     store_ind    cur_ptr
-
+    
     load_imm     buf
     store        cur_ptr
 
 second_loop:
 
     ; Делаем второй проход, читаем посимвольно
-
+    
     load         cur_ptr
     load_acc
 
-    and          const00_00_00_FF
+    and const00_00_00_FF
 
     ; тут уже lowercase пошёл
 
-    store        char_val
-    sub          const_10
-    beqz         programm_end
+    store       char_val    
+    sub         const_10
+    beqz        programm_end
 
     load         char_val
     sub          const_65
@@ -105,36 +105,36 @@ second_loop:
     add          const_32
     store        char_val
 
-    ; Закидываем символ в массив
+; Закидываем символ в массив
 
 store_char:
 
     ; Проверяем на конечный символ
 
-    load         char_val
-    beqz         programm_end
+    load        char_val
+    beqz        programm_end
 
-    store_ind    output_addr
+    store_ind   output_addr
 
     ; Читаем 32 байта из буфера
-
-    load         cur_ptr
+    
+    load cur_ptr
     load_acc
 
     ; Срезаем байт, который хотим записать
 
-    and          const_FF_FF_FF_00
-    add          char_val
+    and const_FF_FF_FF_00
+    add char_val
 
     ; Кладём обработанный вариант
 
-    store_ind    cur_ptr
+    store_ind cur_ptr
 
-    load         cur_ptr
-    add          const_1
-    store        cur_ptr
+    load        cur_ptr
+    add         const_1
+    store       cur_ptr
 
-    jmp          second_loop
+    jmp         second_loop   
 
 overflow_error:
     load         const_error
@@ -142,5 +142,4 @@ overflow_error:
 
 programm_end:
     halt
-
 

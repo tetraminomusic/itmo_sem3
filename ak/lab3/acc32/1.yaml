@@ -1,0 +1,19 @@
+name: Debug Memory and Accumulator
+limit: 2000
+memory_size: 0x1000
+
+memory_mapped_io:
+  0x80: [72, 69, 76, 76, 79, 0, 87, 79, 82, 76, 68, 10]
+  0x84: []
+
+reports:
+
+  # Отчет 2: Финальное состояние памяти и портов
+  - name: "--- FINAL STATE ---"
+    slice: last
+    view: |
+      [ Вход 0x80 остаток ] symio: {io:0x80:sym}
+      [ Выход 0x84 вывод  ] symio: {io:0x84:sym}
+      {Acc:hex}
+      [ Дамп памяти (0..31) ]
+      {memory:0:31}
