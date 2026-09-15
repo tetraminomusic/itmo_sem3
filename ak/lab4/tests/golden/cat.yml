@@ -1,0 +1,19 @@
+in_source: |-
+  (progn
+      ; Обработчик прерывания (trap): пришел символ -> напечатали обратно
+      (definterrupt isr ()
+          (out 1 (in 0)))
+
+      ; Фоновый цикл ожидания
+      (defun wait (n)
+          (if (> n 0)
+              (wait (- n 1))
+              0))
+
+      (wait 50)
+  )
+
+in_stdin: Ping
+
+out_code_hex: ''
+out_stdout: ''

@@ -1,0 +1,11 @@
+in_source: |-
+  (progn
+      (out 1 72)
+      (out 1 101)
+      (out 1 108)
+      (out 1 108)
+      (out 1 111)
+  )
+
+out_code_hex: ''
+out_stdout: ''

@@ -1,0 +1,15 @@
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+# LOG015: вызовы logging.debug/info на root логгере (стандарт для учебных проектов)
+# BLE001: перехват базового Exception в CLI блоке
+# RUF013: неявный Optional в типах
+ignore = ["LOG015", "BLE001", "RUF013"]
+
+[tool.mypy]
+mypy_path= "src"
+explicit_package_bases = true
+
+

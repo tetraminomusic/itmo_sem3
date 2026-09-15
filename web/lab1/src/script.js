@@ -1,7 +1,7 @@
 const canvas = document.getElementById('graphCanvas');
 const ctx = canvas.getContext('2d');
 const logicalSize = 400;
-const dpr = window.devicePixelRatio || 1;
+const dpr = window.devicePixelRatio || 1;   // Для чёткой картинки, тут просто плотность пикселей узнаём
 
 canvas.width = logicalSize * dpr;
 canvas.height = logicalSize * dpr;
@@ -36,23 +36,27 @@ function drawShape(r) {
   ctx.fill();
 
   // третья четверть
-
   ctx.fillRect(center - r * scale, center, r * scale, r * scale);
 }
 
 function checkHit(x, y, r) {
+
+  // Первая четверть
   if (x >= 0 && y >= 0) {
     return (x * x + y * y) <= (r * r);
   }
 
+  // Вторая четверть
   if (x <= 0 && y >= 0) {
     return false;
   }
 
+  // Третья четверть
   if (x <= 0 && y <= 0) {
     return (x >= -r) && (y >= -r);
   }
 
+  // Четвёртая четверть
   if (x >= 0 && y <= 0) {
     return (x <= r / 2) && (y >= (2 * x - r));
   }
@@ -98,26 +102,31 @@ function drawAxes() {
   ctx.fillText("Y", center + 10, 12);
 }
 
+// Возвращает численное значение выбранного чекбокса
 function getSelectedR() {
   const checked = document.querySelector('.r-checkbox:checked');
   return checked ? parseFloat(checked.value) : null
 }
 
+// Достаёт данные о точках и localStorage
 function getSavedPoints() {
   const data = localStorage.getItem('lab1_points');
   return data ? JSON.parse(data) : [];
 }
 
+// Сохраняет точку в общий массив и закидывать в localStorage
 function savePoint(point) {
   const points = getSavedPoints();
   points.push(point);
   localStorage.setItem('lab1_points', JSON.stringify(points));
 }
 
+//
 function addRowToTable(point) {
   const tbody = document.querySelector('#resultsTable tbody');
   const newRow = tbody.insertRow(0); // Вставляем наверх
 
+  // Как раз применяем ES6 плюшки
   newRow.innerHTML = `
     <td>${point.x}</td>
     <td>${point.y}</td>
@@ -129,7 +138,7 @@ function addRowToTable(point) {
       `;
 }
 
-
+// Отрисовывает точки на холсте
 function drawPoints(currentR) {
   const points = getSavedPoints();
   points.forEach(pt => {
@@ -145,6 +154,7 @@ function drawPoints(currentR) {
           ctx.fillStyle = '#95a5a6';
       }
 
+      // Делаем чёрную обводку
       ctx.fill();
       ctx.strokeStyle = "#000000";
       ctx.lineWidth = 1;
@@ -153,6 +163,7 @@ function drawPoints(currentR) {
       });
 }
 
+// Функция обновления холста и отрисовки осей и точек в правильном порядке
 function redrawCanvas() {
     const r = getSelectedR();
 
@@ -170,7 +181,7 @@ function redrawCanvas() {
 
 const checkboxes = document.querySelectorAll('.r-checkbox');
 
-// слушатель всех чекбоксов, дабы нельзя было несколько галочек поставить за раз
+// Слушатель всех чекбоксов, дабы нельзя было несколько галочек поставить за раз
 checkboxes.forEach(cb => {
   cb.addEventListener('change', function() {
     if (this.checked) {
@@ -185,6 +196,7 @@ checkboxes.forEach(cb => {
 
 redrawCanvas();
 
+// Возвращает дату в нужном формате относительно текущей time zone (забыл слово по русски)
 function getCurrentFormattedTime() {
   const now = new Date();
 
@@ -202,7 +214,7 @@ function getCurrentFormattedTime() {
 const form = document.getElementById('pointForm');
 
 form.addEventListener('submit', function(event) {
-  event.preventDefault();
+  event.preventDefault();   // отменяет стандартную перезагрузку браузера
 
   const xVal = parseFloat(document.getElementById('x_val').value);
 
@@ -210,7 +222,7 @@ form.addEventListener('submit', function(event) {
   const yVal = parseFloat(yStr);
   const rVal = getSelectedR();
 
-// Валидация
+  // Валидация
 
   if (isNaN(yVal) || yVal <= -3 || yVal >= 5 || yStr === '') {
     alert('Ошибка ввода! Значение Y должно быть числом строго от -3 до 5.');
@@ -222,7 +234,7 @@ form.addEventListener('submit', function(event) {
     return;
   }
 
-// Если всё заебись, идём дальше
+  // Если всё заебись, идём дальше
 
   const isHit = checkHit(xVal, yVal, rVal);
   const timeString = getCurrentFormattedTime();

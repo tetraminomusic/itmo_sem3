@@ -1,48 +1,112 @@
-import sys
 import argparse
-import pickle
-from isa import Opcode, Instruction
-from parser import tokenize, parse, StringLiteral
+import struct
+import sys
+
+from isa import Instruction, Opcode
+from parser import StringLiteral, parse, tokenize
 
 current_reg = 1
 label_counter = 0
-data_address_counter = 100
+data_address_counter = 1000
 
 available_ports = [0, 1]
 
-symbol_table = {}
-data_memory = {}
-functions = {}                  # {"add_two", "Collatz"} - таблица зарегистрированных функций
-local_vars = {}                 # {"x": "R1", "y": "R2"...} - текущие локальные переменные
+interrupt_handler = None
 
-program = []
+symbol_table: dict[str, int] = {}
+data_memory: dict[int, int] = {}
+functions: dict[str, int] = {}  # {"add_two", "Collatz"} - таблица зарегистрированных функций
+local_vars: dict[str, str] = {}  # {"x": "R1", "y": "R2"...} - текущие локальные переменные
+
+program: list[Instruction | str] = []
 
 INVERSE_JUMPS = {
-    '=':  Opcode.JNZ,
-    '!=': Opcode.JZ,
-    '<':  Opcode.JGE,
-    '<=': Opcode.JG,
-    '>':  Opcode.JLE,
-    '>=': Opcode.JL,
+    "=": Opcode.JNZ,
+    "!=": Opcode.JZ,
+    "<": Opcode.JGE,
+    ">=": Opcode.JL,
 }
 
 BINARY_OPS = {
-            '+', '-', '*', '/', '%', 
-            'and', 'or', 'xor', 
-            'lsl', 'lsr', 'asr', 'rol', 'ror', '<<', '>>'
+    "+",
+    "-",
+    "*",
+    "/",
+    "%",
+    "and",
+    "or",
+    "xor",
+    "lsl",
+    "lsr",
+    "<<",
+    ">>",
+    "asl",
+    "asr",
+    "rol",
+    "ror",
 }
-
 
 RESERVED_KEYWORDS = {
-    'if', 'defun', 'setq', 'progn', 
-    '+', '-', '*', '/', '%', 
-    '=', '!=', '<', '<=', '>', '>=',
-    'in', 'out',
-    'and', 'or', 'xor', 'not',
-    'lsl', 'lsr', 'asr', 'rol', 'ror', '<<', '>>'
+    "if",
+    "defun",
+    "setq",
+    "progn",
+    "+",
+    "-",
+    "*",
+    "/",
+    "%",
+    "=",
+    "!=",
+    "<",
+    "<=",
+    ">",
+    ">=",
+    "in",
+    "out",
+    "and",
+    "or",
+    "xor",
+    "not",
+    "lsl",
+    "lsr",
+    "<<",
+    ">>",
+    "inc",
+    "dec",
+    "print",
+    "aref",
+    "aset",
+    "definterrupt",
 }
 
+# Предварительный проход
+
+
+def collect_function_signatures(node):
+    if isinstance(node, list) and len(node) > 0:
+        if node[0] == "defun" and len(node) == 4 and isinstance(node[2], list):
+            func_name = node[1]
+            arg_list = node[2]
+
+            if func_name in RESERVED_KEYWORDS:
+                raise SyntaxError(
+                    f"Ошибка семантики: Нельзя назвать функцию зарезервированным словом '{func_name}'"
+                )
+
+            if func_name in functions:
+                raise ValueError(
+                    f"Ошибка семантики: Функция с именем '{func_name}' уже объявлена ранее"
+                )
+
+            functions[func_name] = len(arg_list)
+
+        for sub in node:
+            collect_function_signatures(sub)
+
+
 # Размещает Pascal строку в памяти данных и возвращает её начальный адрес
+
 
 def allocate_pstr(text: str) -> int:
     global data_address_counter
@@ -60,6 +124,7 @@ def allocate_pstr(text: str) -> int:
 
 # Возвращает адрес существующей переменной или выделяет новый адрес в памяти
 
+
 def get_or_allocate_var(var_name: str) -> int:
     global data_address_counter
     if var_name not in symbol_table:
@@ -70,8 +135,9 @@ def get_or_allocate_var(var_name: str) -> int:
 
 # Выдает имя следующего свободного регистра, который мы можем использовать для рекурсивного кода
 
+
 def allocate_reg() -> str:
-    global current_reg      # тип используем глобальную для файла переменную
+    global current_reg
 
     if current_reg > 10:
         raise RuntimeError("Ошибка компилятора: закончились свободные регистры")
@@ -83,45 +149,56 @@ def allocate_reg() -> str:
 
 # Освобождает последний занятый регистр
 
+
 def free_reg():
     global current_reg
     current_reg -= 1
 
-# Компоновщик, нужный для замены символических метов на числовые адреса памяти
+
+# Компоновщик, нужный для замены символических меток на числовые адреса памяти
+
 
 def link_program(raw_program: list) -> list:
+
+    # Сначала разбираемся с таблицей векторов прерывания
+
+    vector_table = [
+        Instruction(Opcode.JMP, ["_start"]),
+        Instruction(Opcode.JMP, [interrupt_handler])
+        if interrupt_handler
+        else Instruction(Opcode.IRET),
+    ]
+
+    full_program = vector_table + ["_start:"] + raw_program
+
+    # Первый проход: находим адреса всех меток и собираем чистый список команд
+
     labels_map = {}
     clean_instructions = []
-
-    # певрый проход: находим адреса всех метов и собираем чистый список команд
     current_address = 0
 
-    for item in raw_program:
-        if isinstance(item, str) and item.endswith(':'):
+    for item in full_program:
+        if isinstance(item, str) and item.endswith(":"):
             label_name = item[:-1]
             labels_map[label_name] = current_address
         else:
             clean_instructions.append(item)
             current_address += 1
 
-    # второй проход: подставляем числовые адреса заместо текстовых
+    # Второй проход: подставляем числовые адреса вместо текстовых
 
     for instr in clean_instructions:
         for i, arg in enumerate(instr.args):
-
-            # Если аргумент был названием какой нибудь метки, которую мы использовали
-
             if isinstance(arg, str) and arg in labels_map:
                 instr.args[i] = labels_map[arg]
-
-    # Кек, забыл добавить HLT
 
     clean_instructions.append(Instruction(Opcode.HLT))
 
     return clean_instructions
 
 
-# Создаёт уникальную метку, используется для условий и преобразования с командами ветвления    
+# Создаёт уникальную метку, используется для условий и преобразования с командами ветвления
+
 
 def make_label(prefix: str = "L") -> str:
     global label_counter
@@ -132,44 +209,60 @@ def make_label(prefix: str = "L") -> str:
 
 # Компилирует нужное условие сравнения под знак сравнения + генерирует команду CMP и возвращает опкод прыжка в ELSE
 
+
 def compile_condition(condition_node: list) -> Opcode:
-    op = condition_node[0]
-    left = condition_node[1]
-    right = condition_node[2]
 
-    if op not in INVERSE_JUMPS:
-        raise ValueError(f"Неизвестный оператор сравнения: {op}")
+    if (
+        isinstance(condition_node, list)
+        and len(condition_node) == 3
+        and condition_node[0] in ("=", "!=", "<", "<=", ">", ">=")
+    ):
+        op = condition_node[0]
+        left = condition_node[1]
+        right = condition_node[2]
 
-    reg_left = compile_expr(left)
-    reg_right = compile_expr(right)
+        if op == ">":
+            reg_right = compile_expr(right)
+            reg_left = compile_expr(left)
+            program.append(Instruction(Opcode.CMP, [reg_right, reg_left]))
+            free_reg()
+            free_reg()
+            return Opcode.JGE
 
-    program.append(Instruction(Opcode.CMP, [reg_left, reg_right]))
+        elif op == "<=":
+            reg_right = compile_expr(right)
+            reg_left = compile_expr(left)
+            program.append(Instruction(Opcode.CMP, [reg_right, reg_left]))
+            free_reg()
+            free_reg()
+            return Opcode.JL
 
+        reg_left = compile_expr(left)
+        reg_right = compile_expr(right)
+        program.append(Instruction(Opcode.CMP, [reg_left, reg_right]))
+        free_reg()
+        free_reg()
+        return INVERSE_JUMPS[op]
+
+    cond_reg = compile_expr(condition_node)
+    program.append(Instruction(Opcode.CMP, [cond_reg, "R0"]))
     free_reg()
-    free_reg()
+    return Opcode.JZ
 
-    return INVERSE_JUMPS[op]
 
-def compile_expr(node) -> str:
-    global local_vars
+def compile_expr(node) -> str | None:
+    global local_vars, current_reg, interrupt_handler
 
-    # Проверяем, может это вообще простое число   
+    # Проверяем, может это простое число
 
     if isinstance(node, int):
-
-        #   Запись простого числа в регистр - простое число 5
-        #   Для этого используем команду LD с записью нашего конкретного числа
-
         reg = allocate_reg()
         program.append(Instruction(Opcode.LDI, [reg, node]))
         return reg
 
-    # Проверяем, что это какая-то строковая переменная
+    # Проверяем строковую переменную
 
     if isinstance(node, str):
-
-        # Локальные переменные
-
         if node in local_vars:
             reg = allocate_reg()
             program.append(Instruction(Opcode.ADD, [reg, local_vars[node], "R0"]))
@@ -184,182 +277,251 @@ def compile_expr(node) -> str:
 
         raise NameError(f"Использование необъявленной переменной: '{node}'")
 
-    # Проверяем, что это возможно какая-то строка
+    # Проверяем строковый литерал
 
     if isinstance(node, StringLiteral):
         str_addr = allocate_pstr(node.text)
-
-        # Загружаем адрес строки в регистр
-
         reg = allocate_reg()
         program.append(Instruction(Opcode.LDI, [reg, str_addr]))
-
-        # Возвращаем регистр, где лежит указатель на строку
-
         return reg
 
-
-    # Рекурсивный случай, если узел дерева - это операция в скобках
+    # Рекурсивный случай: списковое выражение
 
     if isinstance(node, list):
-
         if len(node) == 0:
             raise SyntaxError("Пустые скобки '()' не являются допустимым выражением")
 
         op = node[0]
 
-        # Если это команда на последовательное выполнение progn
+        # Разрешение прерывания
 
-        if op == 'progn':
+        if op == "ei":
+            program.append(Instruction(Opcode.EI))
+            return None
+
+        # Запрет прерывания
+
+        if op == "di":
+            program.append(Instruction(Opcode.DI))
+            return None
+
+        # Чтение элемента массива по индексу
+
+        if op == "aref":
+            if len(node) != 3:
+                raise SyntaxError(
+                    "Команда 'aref' требует 2 аргумента: (aref массив индекс)"
+                )
+
+            base_expr = node[1]
+            idx_expr = node[2]
+
+            base_reg = compile_expr(base_expr)
+            idx_reg = compile_expr(idx_expr)
+
+            program.append(Instruction(Opcode.ADD, [base_reg, base_reg, idx_reg]))
+            free_reg()
+
+            program.append(Instruction(Opcode.LD, [base_reg, base_reg, 0]))
+            return base_reg
+
+        # Запись в массив/строку по индексу
+
+        if op == "aset":
+            if len(node) != 4:
+                raise SyntaxError(
+                    "Команда 'aset' требует 3 аргумента: (aset массив индекс значение)"
+                )
+
+            base_expr = node[1]
+            idx_expr = node[2]
+            val_expr = node[3]
+
+            base_reg = compile_expr(base_expr)
+            idx_reg = compile_expr(idx_expr)
+            val_reg = compile_expr(val_expr)
+
+            program.append(Instruction(Opcode.ADD, [base_reg, base_reg, idx_reg]))
+            program.append(Instruction(Opcode.ST, [val_reg, base_reg, 0]))
+
+            program.append(Instruction(Opcode.ADD, [base_reg, val_reg, "R0"]))
+
+            free_reg()
+            free_reg()
+            return base_reg
+
+        # Последовательное выполнение progn
+
+        if op == "progn":
             last_reg = None
-            for expr in node [1:]:
+            for expr in node[1:]:
                 if last_reg is not None:
                     free_reg()
                 last_reg = compile_expr(expr)
             return last_reg
 
-        # Если это команда создания новой функции
+        # Объявление обработчика прерывания
 
-        if op == 'defun':
-
+        if op == "definterrupt":
             if len(node) != 4:
-                raise SyntaxError("Контрукция 'defun' требует: (defun имя (аргументы) тело)")
+                raise SyntaxError(
+                    "Конструкция 'definterrupt' требует: (definterrupt имя () тело)"
+                )
 
-            func_name = node[1] # 'add_two'
-            arg_list = node[2]  # ['x']
-            body_expr = node[3] # ['+', 'x', 2]
+            handler_name = node[1]
+            body_expr = node[3]
+
+            interrupt_handler = handler_name
+
+            label_skip = make_label(f"skip_intr_{handler_name}")
+            program.append(Instruction(Opcode.JMP, [label_skip]))
+            program.append(f"{handler_name}:")
+
+            for i in range(1, 11):
+                program.append(Instruction(Opcode.PUSH, [f"R{i}"]))
+
+            old_reg = current_reg
+            current_reg = 1
+            intr_res = compile_expr(body_expr)
+            if intr_res is not None:
+                free_reg()
+            current_reg = old_reg
+
+            for i in range(10, 0, -1):
+                program.append(Instruction(Opcode.POP, [f"R{i}"]))
+
+            program.append(Instruction(Opcode.IRET))
+            program.append(f"{label_skip}:")
+            return None
+
+        # Объявление функции
+
+        if op == "defun":
+            if len(node) != 4:
+                raise SyntaxError(
+                    "Контрукция 'defun' требует: (defun имя (аргументы) тело)"
+                )
+
+            func_name = node[1]
+            arg_list = node[2]
+            body_expr = node[3]
 
             if not isinstance(arg_list, list):
-                raise TypeError("Список аргументов функции должен быть списком в скобках ()")
-
-            # Не объявлена ли функция с зарезервированным именем
-
-            if func_name in RESERVED_KEYWORDS:
-                raise SyntaxError(f"Ошибка семантики: Нельзя назвать функции зарезервированным словом '{func_name}'")
-
-            # Не объявлена ли функция с таким именем уже
-
-            if func_name in functions:
-                raise ValueError(f"Ошибка семантики: Функция с именем '{func_name}' уже объявлена ранее")
-
-            # Проверка на наличие дубликов среди аргументов 
+                raise TypeError(
+                    "Список аргументов функции должен быть списком в скобках ()"
+                )
 
             if len(arg_list) != len(set(arg_list)):
-                raise SyntaxError(f"Ошибка в функции '{func_name}': аргументы имеют одинаковые имена")
-
-            functions[func_name] = len(arg_list)
+                raise SyntaxError(
+                    f"Ошибка в функции '{func_name}': аргументы имеют одинаковые имена"
+                )
 
             label_after_func = make_label(f"skip_{func_name}")
-
-            # Прыгаем в обход тела функции (дабы её случайно не выполнить)
-
             program.append(Instruction(Opcode.JMP, [label_after_func]))
-
             program.append(f"{func_name}:")
 
-            # Закидываем адрес возврата в стек, дабы можно было адекватно реализовать рекурсию
-
-            program.append(Instruction(Opcode.PUSH, ["LR"]))
-
-            # Настраиваем аргументы (первый аргумент в R1, второй в R2 и так далее)
-
             old_locals = local_vars.copy()
-            local_vars = {}
-            for i, arg_name in enumerate(arg_list):
-                local_vars[arg_name] = f"R{i+1}"
+            old_reg = current_reg
+
+            local_vars = {arg_name: f"R{i + 1}" for i, arg_name in enumerate(arg_list)}
+            current_reg = len(arg_list) + 1
 
             result_reg = compile_expr(body_expr)
 
-            if result_reg != "R1":
+            if result_reg != "R1" and result_reg is not None:
                 program.append(Instruction(Opcode.ADD, ["R1", result_reg, "R0"]))
 
-            program.append(Instruction(Opcode.POP, ["LR"]))
             program.append(Instruction(Opcode.RET))
 
+            if result_reg is not None:
+                free_reg()
+
             local_vars = old_locals
-
+            current_reg = old_reg
             program.append(f"{label_after_func}:")
-
             return None
+
+        # Печать
+
+        if op == "print":
+            if len(node) != 2:
+                raise SyntaxError(
+                    "Команда 'print' требует 1 аргумент: (print значение)"
+                )
+            val_reg = compile_expr(node[1])
+            program.append(Instruction(Opcode.OUT, [1, val_reg]))
+            return val_reg
 
         # Присваивание setq
 
-        if op == 'setq':
-
+        if op == "setq":
             if len(node) != 3:
-                raise SyntaxError("Команда 'setq' требует ровно 2 аргумента: (setq имя значение)")
+                raise SyntaxError(
+                    "Команда 'setq' требует ровно 2 аргумента: (setq имя значение)"
+                )
 
-            var_name = node[1]      # 'x'
-            value_expr = node[2]    # Выражение справа, которое мы хотим записать
+            var_name = node[1]
+            value_expr = node[2]
 
             if not isinstance(var_name, str):
-                raise TypeError(f"Имя переменной должно быть строкой, получено: {var_name}")
+                raise TypeError(
+                    f"Имя переменной должно быть строкой, получено: {var_name}"
+                )
 
             if var_name in RESERVED_KEYWORDS:
-                raise SyntaxError(f"Нельзя использовать зарезервированное слово '{var_name}' в качестве имени переменной")
-
-            
+                raise SyntaxError(
+                    f"Нельзя использовать зарезервированное слово '{var_name}' в качестве имени переменной"
+                )
 
             addr = get_or_allocate_var(var_name)
             val_reg = compile_expr(value_expr)
 
-            # Выделяем временный регистр под адрес ячейки
             addr_reg = allocate_reg()
             program.append(Instruction(Opcode.LDI, [addr_reg, addr]))
-
-            # Сохраняем в память по нужному адресу
             program.append(Instruction(Opcode.ST, [val_reg, addr_reg, 0]))
-
             free_reg()
 
             return val_reg
 
-        # Обработка If
+        # Ветвление if
 
-        if op == 'if':
-
+        if op == "if":
             if len(node) != 4:
-                raise SyntaxError("'if' требует ровно 3 аргумента: (if условие then else)")
+                raise SyntaxError(
+                    "'if' требует ровно 3 аргумента: (if условие then else)"
+                )
 
-            condition = node[1]         # (= x 1) for exmp
+            condition = node[1]
             then_branch = node[2]
             else_branch = node[3]
-
-            # Создаём уникальные метки для ветвлений
 
             label_else = make_label("else")
             label_end = make_label("end")
 
-            # Вычисляем условие + ставим флаги NZVC
-
             jump_to_else_op = compile_condition(condition)
-
-            # Выделяем один регистр для итогового результата всего if
-
             result_reg = allocate_reg()
 
             program.append(Instruction(jump_to_else_op, [label_else]))
 
-            #THEN
+            # THEN
             then_reg = compile_expr(then_branch)
             if then_reg is not None:
                 program.append(Instruction(Opcode.ADD, [result_reg, then_reg, "R0"]))
                 free_reg()
             program.append(Instruction(Opcode.JMP, [label_end]))
 
-            #ELSE
-            program.append(f"{label_else}:")    # пишем метку
+            # ELSE
+            program.append(f"{label_else}:")
             else_reg = compile_expr(else_branch)
             if else_reg is not None:
                 program.append(Instruction(Opcode.ADD, [result_reg, else_reg, "R0"]))
                 free_reg()
 
-
-            #END
+            # END
             program.append(f"{label_end}:")
             return result_reg
 
-        # Если это пользовательская функция
+        # Вызов пользовательской функции
 
         if op in functions:
             passed_args = node[1:]
@@ -371,24 +533,39 @@ def compile_expr(node) -> str:
                     f"но было передано {len(passed_args)}"
                 )
 
-            for i, arg_expr in enumerate(passed_args):
-                target_reg = f"R{i+1}"
-                res_reg = compile_expr(arg_expr)
-                if res_reg != target_reg:
-                    program.append(Instruction(Opcode.ADD, [target_reg, res_reg, "R0"]))
+            active_regs = [f"R{i}" for i in range(1, current_reg)]
+            for r in active_regs:
+                program.append(Instruction(Opcode.PUSH, [r]))
+
+            arg_temp_regs = []
+            for arg_expr in passed_args:
+                arg_temp_regs.append(compile_expr(arg_expr))
+
+            for i, temp_r in enumerate(arg_temp_regs):
+                target_r = f"R{i + 1}"
+                if temp_r != target_r:
+                    program.append(Instruction(Opcode.ADD, [target_r, temp_r, "R0"]))
 
             program.append(Instruction(Opcode.CALL, [op]))
 
-            out_reg = allocate_reg()
-            program.append(Instruction(Opcode.ADD, [out_reg, "R1", "R0"]))
-            return out_reg
+            for _ in arg_temp_regs:
+                free_reg()
 
-        # Вывод в конкретный порт
+            res_reg = allocate_reg()
+            program.append(Instruction(Opcode.ADD, [res_reg, "R1", "R0"]))
 
-        if op == 'out':
+            for r in reversed(active_regs):
+                program.append(Instruction(Opcode.POP, [r]))
 
+            return res_reg
+
+        # Вывод в порт
+
+        if op == "out":
             if len(node) != 3:
-                raise SyntaxError("Команда 'out' требует два аргумента: (out порт значение)")
+                raise SyntaxError(
+                    "Команда 'out' требует два аргумента: (out порт значение)"
+                )
 
             port_num = node[1]
             val_expr = node[2]
@@ -397,113 +574,116 @@ def compile_expr(node) -> str:
                 raise ValueError(f"Некорректный номер порта: {port_num}")
 
             val_reg = compile_expr(val_expr)
-
             program.append(Instruction(Opcode.OUT, [port_num, val_reg]))
-
             free_reg()
             return None
 
-        # Ввод в конкретный порт
+        # Ввод из порта
 
-        if op == 'in':
+        if op == "in":
             if len(node) != 2:
                 raise SyntaxError("Команда 'in' требует 1 аргумент: (in порт)")
 
             port_num = node[1]
-
             if not isinstance(port_num, int) or port_num not in available_ports:
                 raise ValueError(f"Некорректный номер порта: {port_num}")
 
-            # выделяем регистр под прочитанное значение
-
             reg = allocate_reg()
-
             program.append(Instruction(Opcode.IN, [reg, port_num]))
-
             return reg
 
-        # Унарная операция логического NOT
+        # Унарные операции
 
-        if op == 'not':
+        if op == "not":
             arg_reg = compile_expr(node[1])
             program.append(Instruction(Opcode.NOT, [arg_reg, arg_reg]))
             return arg_reg
 
-        # Арифметика
+        if op == "inc":
+            arg_reg = compile_expr(node[1])
+            program.append(Instruction(Opcode.INC, [arg_reg]))
+            return arg_reg
+
+        if op == "dec":
+            arg_reg = compile_expr(node[1])
+            program.append(Instruction(Opcode.DEC, [arg_reg]))
+            return arg_reg
+
+        # Арифметика вариативная (+ 1 2 3...)
+
+        if op in ("+", "*"):
+            if len(node) < 3:
+                raise SyntaxError(f"Операция '{op}' требует как минимум 2 операнда")
+
+            accum_reg = compile_expr(node[1])
+            for next_expr in node[2:]:
+                next_reg = compile_expr(next_expr)
+                if op == "+":
+                    program.append(
+                        Instruction(Opcode.ADD, [accum_reg, accum_reg, next_reg])
+                    )
+                elif op == "*":
+                    program.append(
+                        Instruction(Opcode.MUL, [accum_reg, accum_reg, next_reg])
+                    )
+                free_reg()
+
+            return accum_reg
+
+        # Бинарная арифметика и побитовые операции
 
         if op in BINARY_OPS:
             if len(node) != 3:
-                raise SyntaxError(f"Операция '{op}' требует ровно 2 операнда, получено: {len(node) - 1}")
-            
+                raise SyntaxError(
+                    f"Операция '{op}' требует ровно 2 операнда, получено: {len(node) - 1}"
+                )
+
             left = node[1]
             right = node[2]
 
             left_reg = compile_expr(left)
             right_reg = compile_expr(right)
 
-            if op == '+':
-                program.append(Instruction(Opcode.ADD, [left_reg, left_reg, right_reg]))
-            elif op == '-':
+            if op == "-":
                 program.append(Instruction(Opcode.SUB, [left_reg, left_reg, right_reg]))
-            elif op == '*':
-                program.append(Instruction(Opcode.MUL, [left_reg, left_reg, right_reg]))
-            elif op == '/':
+            elif op == "/":
                 program.append(Instruction(Opcode.DIV, [left_reg, left_reg, right_reg]))
-            elif op == '%':
+            elif op == "%":
                 program.append(Instruction(Opcode.MOD, [left_reg, left_reg, right_reg]))
-
-            # Побитовая логика
-
-            elif op == 'and':
+            elif op == "and":
                 program.append(Instruction(Opcode.AND, [left_reg, left_reg, right_reg]))
-            elif op == 'or':
+            elif op == "or":
                 program.append(Instruction(Opcode.OR, [left_reg, left_reg, right_reg]))
-            elif op == 'xor':
+            elif op == "xor":
                 program.append(Instruction(Opcode.XOR, [left_reg, left_reg, right_reg]))
-
-            # Слдвиги
-
-            elif op in ('lsl', '<<'):
+            elif op in ("lsl", "<<", "asr", "rol"):
                 program.append(Instruction(Opcode.LSL, [left_reg, left_reg, right_reg]))
-            elif op in ('lsr', '>>'):
+            elif op in ("lsr", ">>", "asr", "ror"):
                 program.append(Instruction(Opcode.LSR, [left_reg, left_reg, right_reg]))
-            elif op == 'asr':
-                program.append(Instruction(Opcode.ASR, [left_reg, left_reg, right_reg]))
-            elif op == 'rol':
-                program.append(Instruction(Opcode.ROL, [left_reg, left_reg, right_reg]))
-            elif op == 'ror':
-                program.append(Instruction(Opcode.ROR, [left_reg, left_reg, right_reg]))
 
-            # Если не нашли нужную операцию
+            free_reg()
+            return left_reg
 
-        else:
-            raise SyntaxError(f"Неизвестная операция или необъявленная функция: '{op}'")
+        raise SyntaxError(f"Неизвестная операция или необъявленная функция: '{op}'")
+    return None
 
-        free_reg()
-        return left_reg
-
-
-
-# Сохранение в файлы + cli интерфейс
-
-
-# <address> - <HEXCODE> - <mnemonic>
 
 def generate_listing(instructions: list) -> str:
     lines = []
     for addr, instr in enumerate(instructions):
-        hex_code = f"0x{instr.encode():08X}"
-        lines.append(f"{addr:04d} - {hex_code} - {instr}")
+        if isinstance(instr, Instruction):
+            hex_code = f"0x{instr.encode():08X}"
+            lines.append(f"{addr:04d} - {hex_code} - {instr}")
+        elif isinstance(instr, int):
+            hex_code = f"0x{instr:08X}"
+            lines.append(f"{addr:04d} - {hex_code} - VECTOR_DATA 0x{instr:04X}")
     return "\n".join(lines)
 
-# читает исходный файл lisp, компилирует и сохраняет в выходной файл
 
-def compile_file(source_file: str, target_file: str, listing_file: str = None):
-
-    # Делаем программу реентерабельной
-
+def compile_file(source_file: str, target_file: str, listing_file: str | None = None):
     global program, symbol_table, data_memory, functions, local_vars
-    global current_reg, label_counter, data_address_counter
+    global current_reg, label_counter, data_address_counter, interrupt_handler
+
     program = []
     symbol_table = {}
     data_memory = {}
@@ -511,38 +691,36 @@ def compile_file(source_file: str, target_file: str, listing_file: str = None):
     local_vars = {}
     current_reg = 1
     label_counter = 0
-    data_address_counter = 100
+    data_address_counter = 1000
+    interrupt_handler = None
 
     with open(source_file, "r", encoding="utf-8") as f:
         code_text = f.read()
 
-    # токенизация + парсинг
-
     tokens = tokenize(code_text)
     ast = parse(tokens)
 
-    # компиляция
+    collect_function_signatures(ast)
 
     compile_expr(ast)
 
-    # линковка
-
     machine_code = link_program(program)
 
-    # Сохраняем в бинарник
-    
-    payload = {
-        "code": machine_code,
-        "data_memory": data_memory,
-        "symbol_table": symbol_table
-    }
+    memory_dump = [0] * 4096
+
+    for addr, instr in enumerate(machine_code):
+        if isinstance(instr, Instruction):
+            memory_dump[addr] = instr.encode()
+        elif isinstance(instr, int):
+            memory_dump[addr] = instr
+
+    for addr, val in data_memory.items():
+        memory_dump[addr] = val
 
     with open(target_file, "wb") as f:
-        pickle.dump(payload, f)
+        f.writelines(struct.pack(">I", word & 0xFFFF_FFFF) for word in memory_dump)
 
     print(f"Машинный код записан в: {target_file}")
-
-    # Сохраняем отладочный файл/листинг
 
     if listing_file:
         listing_text = generate_listing(machine_code)
@@ -551,13 +729,22 @@ def compile_file(source_file: str, target_file: str, listing_file: str = None):
         print(f"Отладочный листинг записан в: {listing_file}")
 
 
-# Точка входа для работы из консоли
-
 def main():
-    parser = argparse.ArgumentParser(description="Консольный транслятор LISP в машинный код RISC процессора")
-    parser.add_argument("-i", "--input", required=True, help="Путь к исходному файлу (.lisp)")
-    parser.add_argument("-o","--output", required=True, help="Путь к выходному бинарному файлу (.bin)")
-    parser.add_argument("-l", "--listing", default=None, help="Путь к файлу листинга (.txt, опционально)")
+    parser = argparse.ArgumentParser(
+        description="Консольный транслятор LISP в машинный код RISC процессора"
+    )
+    parser.add_argument(
+        "-i", "--input", required=True, help="Путь к исходному файлу (.lisp)"
+    )
+    parser.add_argument(
+        "-o", "--output", required=True, help="Путь к выходному бинарному файлу (.bin)"
+    )
+    parser.add_argument(
+        "-l",
+        "--listing",
+        default=None,
+        help="Путь к файлу листинга (.txt, опционально)",
+    )
 
     args = parser.parse_args()
 
@@ -567,6 +754,6 @@ def main():
         print(f"Ошибка компиляции: {e}", file=sys.stderr)
         sys.exit(1)
 
-if __name__ == '__main__':
-    main()
 
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,50 @@
+in_source: |-
+  (progn
+      ; Печатаем "What is your name? "
+      (out 1 87) ; W
+      (out 1 104); h
+      (out 1 97) ; a
+      (out 1 116); t
+      (out 1 32) ;  
+      (out 1 105); i
+      (out 1 115) ; s
+      (out 1 32) ;  
+      (out 1 121); y
+      (out 1 111); o
+      (out 1 117); u
+      (out 1 114); r
+      (out 1 32) ;  
+      (out 1 110); n
+      (out 1 97) ; a
+      (out 1 109); m
+      (out 1 101); e
+      (out 1 58) ; :
+      (out 1 32) ;  
+
+      ; Обработчик: ловим имя и печатаем "Hello, Alice!"
+      (definterrupt isr ()
+          (progn
+              (setq name (in 0))
+              (out 1 72)  ; H
+              (out 1 101) ; e
+              (out 1 108) ; l
+              (out 1 108) ; l
+              (out 1 111) ; o
+              (out 1 44)  ; ,
+              (out 1 32)  ;  
+              (out 1 name); (вводимая буква)
+              (out 1 33)  ; !
+          ))
+
+      (defun wait (n)
+          (if (> n 0)
+              (wait (- n 1))
+              0))
+
+      (wait 50)
+  )
+
+in_stdin: A
+
+out_code_hex: ''
+out_stdout: ''

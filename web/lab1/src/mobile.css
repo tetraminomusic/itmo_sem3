@@ -1,0 +1,54 @@
+body {
+  margin: 10px;
+}
+
+.header-table {
+  font-size: 14px;
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.header-table td {
+  padding: 10px;
+}
+
+table.main-layout,
+table.main-layout tbody,
+table.main-layout tr,
+table.main-layout td.column {
+  display: block;
+  width: 100% !important;
+  box-sizing: border-box;
+}
+
+table.main-layout td.column:first-child {
+  margin-bottom: 15px;
+}
+
+table.main-layout td.column {
+  padding: 15px;
+}
+
+#graphCanvas {
+  max-width: 100%;
+  height: auto;
+}
+
+input[type="text"], select, .checkbox-container {
+  width: 100%;
+  max-width: 220px;
+}
+
+table.results-table {
+  display: block;
+  overflow-x: auto;
+  white-space: nowrap;
+  font-size: 12px;
+  margin-top: 15px;
+}
+
+table.results-table > thead > tr > th,
+table.results-table td {
+  padding: 8px 10px;
+}
+

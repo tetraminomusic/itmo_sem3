@@ -50,9 +50,9 @@ input[type="text"], select {
 }
 
 input[type="text"]:focus, select:focus {
-  outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
 }
 
 /*Селектор пвсевдоэлементов */
@@ -61,31 +61,38 @@ input[type="text"]::placeholder {
     font-style: italic;
 }
 
+.button-cell {
+    display: flex;
+    justify-content: center;
+    padding-top: 20px;
+}
+
 button[type="submit"] {
-  padding: 12px 28px;
-  background-color: #2563eb;
-  color: #ffffff;
-  font-size: 15px;
-  font-weight: 600;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
+    display: inline-block;
+    padding: 12px 28px;
+    background-color: #2563eb;
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
 }
 
 button[type="submit"]:hover {
-  background-color: #1d4ed8;
+    background-color: #1d4ed8;
 }
 
 button[type="submit"]:active {
-  background-color: #1e40af;
+    background-color: #1e40af;
 }
 
 .checkbox-container input[type="checkbox"] {
-  cursor: pointer;
-  width: 16px;
-  height: 16px;
-  margin-right: 4px;
-  accent-color: #2563eb;
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+    margin-right: 4px;
+    accent-color: #2563eb;
 }
 
 table.results-table {
@@ -93,6 +100,10 @@ table.results-table {
     border-collapse: collapse;
     margin-top: 25px;
     text-align: center;
+}
+
+td[colspan="2"] {
+    align-items: center;
 }
 
 table.results-table > thead > tr > th {
@@ -109,28 +120,37 @@ table.results-table td {
 }
 
 #pointForm table td {
-  padding: 12px 8px;
-  vertical-align: middle;
+    padding: 12px 8px;
+    vertical-align: middle;
 }
 
 #pointForm strong {
-  color: #1e293b;
-  font-size: 15px;
+    color: #1e293b;
+    font-size: 15px;
 }
 
 .checkbox-container {
-  width: 220px;
-  display: flex;
-  justify-content: center; /* Центрирует строго по середине */
-  align-items: center;
-  gap: 8px; /* Одинаковые аккуратные промежутки между чекбоксами */
+    width: 220px;
+    display: flex;
+    justify-content: center; /* Центрирует строго по середине */
+    align-items: center;
+    gap: 8px; /* Одинаковые аккуратные промежутки между чекбоксами */
 }
 
 .checkbox-container label {
-  display: inline-flex;
-  align-items: center;
-  font-size: 15px;
-  font-weight: 500;
-  cursor: pointer;
-  user-select: none;
+    display: inline-flex;
+    align-items: center;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+}
+
+#pointForm {
+    text-align: center;
+}
+
+#pointForm button[type="submit"] {
+    display: inline-block !important;
+    margin: 15px auto 0 auto !important;
 }

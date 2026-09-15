@@ -1,0 +1,18 @@
+in_source: |-
+  (progn
+      ; Рекурсивная функция подсчета длины Коллатца
+      (defun collatz (n count)
+          (if (= n 1)
+              count
+              (if (= (% n 2) 0)
+                  (collatz (/ n 2) (+ count 1))
+                  (collatz (+ (* 3 n) 1) (+ count 1)))))
+
+      ; Код 8 в ASCII это бе управляющий символ, поэтому прибавим 60 (68 = 'D') 
+      ; Или просто выведем результат в память. Пусть вернет 8 шагов -> прибавим 48 ('8')
+      (setq steps (+ (collatz 6 0) 48))
+      (out 1 steps)
+  )
+
+out_code_hex: ''
+out_stdout: ''
